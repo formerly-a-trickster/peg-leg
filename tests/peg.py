@@ -92,6 +92,13 @@ class PegTestCase(TestCase):
                                       Opt(Rule('three')))))
         self.assertAstEqual(res, expect)
 
+    def test_group_contents_are_extracted(self):
+        rule = 'test <- (one two)'
+        res = peg_parser.parse(rule)
+        expect = Rule('test', Seq(Rule('one'),
+                                  Rule('two')))
+        self.assertAstEqual(res, expect)
+
     def test_lookahead_is_parsed(self):
         rule = 'test <- &one'
         res = peg_parser.parse(rule)
