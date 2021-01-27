@@ -30,7 +30,7 @@ class PegTestCase(TestCase):
         rule = 'test <- one'
         res = peg_parser.parse(rule)
         expect = Rule('test', Rule('one'))
-        self.assertAstEqual(res, expect)
+        self.assertAstEqual(expect, res)
 
     def test_sequences_are_parsed(self):
         rule = 'test <- one two three'
@@ -38,7 +38,7 @@ class PegTestCase(TestCase):
         expect = Rule('test', Seq(Rule('one'),
                                   Rule('two'),
                                   Rule('three')))
-        self.assertAstEqual(res, expect)
+        self.assertAstEqual(expect, res)
 
     def test_alternatives_are_parsed(self):
         rule = 'test <- one | two | three'
@@ -46,7 +46,7 @@ class PegTestCase(TestCase):
         expect = Rule('test', Alt(Rule('one'),
                                   Rule('two'),
                                   Rule('three')))
-        self.assertAstEqual(res, expect)
+        self.assertAstEqual(expect, res)
 
     def test_sequence_binds_tighter_than_alternative(self):
         rule = 'test <- one two | three four'
@@ -55,13 +55,13 @@ class PegTestCase(TestCase):
             Seq(Rule('one'), Rule('two')),
             Seq(Rule('three'), Rule('four'))
         ))
-        self.assertAstEqual(res, expect)
+        self.assertAstEqual(expect, res)
 
     def test_multiples_are_parsed(self):
         rule = 'test <- one*'
         res = peg_parser.parse(rule)
         expect = Rule('test', Mult(0, Rule('one')))
-        self.assertAstEqual(res, expect)
+        self.assertAstEqual(expect, res)
 
     def test_multiple_binds_tighter_than_seq_or_alt(self):
         rule = 'test <- one | two three*'
@@ -69,20 +69,20 @@ class PegTestCase(TestCase):
         expect = Rule('test', Alt(Rule('one'),
                                   Seq(Rule('two'),
                                       Mult(0, Rule('three')))))
-        self.assertAstEqual(res, expect)
+        self.assertAstEqual(expect, res)
 
         rule = 'test <- one | two three+'
         res = peg_parser.parse(rule)
         expect = Rule('test', Alt(Rule('one'),
                                   Seq(Rule('two'),
                                       Mult(1, Rule('three')))))
-        self.assertAstEqual(res, expect)
+        self.assertAstEqual(expect, res)
 
     def test_optional_is_parsed(self):
         rule = 'test <- one?'
         res = peg_parser.parse(rule)
         expect = Rule('test', Opt(Rule('one')))
-        self.assertAstEqual(res, expect)
+        self.assertAstEqual(expect, res)
 
     def test_optional_binds_tighter_than_seq_or_alt(self):
         rule = 'test <- one | two three?'
@@ -90,20 +90,20 @@ class PegTestCase(TestCase):
         expect = Rule('test', Alt(Rule('one'),
                                   Seq(Rule('two'),
                                       Opt(Rule('three')))))
-        self.assertAstEqual(res, expect)
+        self.assertAstEqual(expect, res)
 
     def test_group_contents_are_extracted(self):
         rule = 'test <- (one two)'
         res = peg_parser.parse(rule)
         expect = Rule('test', Seq(Rule('one'),
                                   Rule('two')))
-        self.assertAstEqual(res, expect)
+        self.assertAstEqual(expect, res)
 
     def test_lookahead_is_parsed(self):
         rule = 'test <- &one'
         res = peg_parser.parse(rule)
         expect = Rule('test', Look(Rule('one')))
-        self.assertAstEqual(res, expect)
+        self.assertAstEqual(expect, res)
 
     def test_lookahead_binds_tighter_than_seq_or_alt(self):
         rule = 'test <- &one | two three'
@@ -111,51 +111,75 @@ class PegTestCase(TestCase):
         expect = Rule('test', Alt(Look(Rule('one')),
                                   Seq(Rule('two'),
                                       Rule('three'))))
-        self.assertAstEqual(res, expect)
+        self.assertAstEqual(expect, res)
 
     def test_negative_lookahead_is_parsed(self):
         rule = 'test <- !one'
         res = peg_parser.parse(rule)
         expect = Rule('test', NLook(Rule('one')))
-        self.assertAstEqual(res, expect)
+        self.assertAstEqual(expect, res)
 
     def test_that_negative_lookahead_bings_tighter_than_seq_or_alt(self):
         rule = 'test <- !one | two three'
         res = peg_parser.parse(rule)
         expect = Rule('test', Alt(NLook(Rule('one')),
                                   Seq(Rule('two'), Rule('three'))))
-        self.assertAstEqual(res, expect)
+        self.assertAstEqual(expect, res)
 
     def test_suffixes_bind_tighter_than_prefixes(self):
         rule = 'test <- &one*'
         res = peg_parser.parse(rule)
         expect = Rule('test', Look(Mult(0, Rule('one'))))
-        self.assertAstEqual(res, expect)
+        self.assertAstEqual(expect, res)
 
     def test_string_is_parsed(self):
         rule = 'test <- "one"'
         res = peg_parser.parse(rule)
         expect = Rule('test', Str('one'))
-        self.assertAstEqual(res, expect)
+        self.assertAstEqual(expect, res)
 
     def test_strings_with_spaces_are_parsed(self):
         rule = 'test <- "one "'
         res = peg_parser.parse(rule)
         expect = Rule('test', Str('one '))
-        self.assertAstEqual(res, expect)
+        self.assertAstEqual(expect, res)
 
         rule = 'test <- " one"'
         res = peg_parser.parse(rule)
         expect = Rule('test', Str(' one'))
-        self.assertAstEqual(res, expect)
+        self.assertAstEqual(expect, res)
 
         rule = 'test <- " one "'
         res = peg_parser.parse(rule)
         expect = Rule('test', Str(' one '))
-        self.assertAstEqual(res, expect)
+        self.assertAstEqual(expect, res)
+
+    def test_strings_with_escaped_quotes_are_parsed(self):
+        rule = r'test <- "\"one\""'
+        res = peg_parser.parse(rule)
+        expect = Rule('test', Str('"one"'))
+        self.assertAstEqual(expect, res)
+
+    def test_strings_with_escaped_bslashes_are_parsed(self):
+        rule = 'test <- "\\\\one\\\\"'
+        res = peg_parser.parse(rule)
+        expect = Rule('test', Str('\\one\\'))
+        self.assertAstEqual(expect, res)
 
     def test_regex_is_parsed(self):
         rule = 'test <- /one/'
         res = peg_parser.parse(rule)
         expect = Rule('test', Rgx('one'))
-        self.assertAstEqual(res, expect)
+        self.assertAstEqual(expect, res)
+
+    def test_regex_with_escpaed_fslashes_are_parsed(self):
+        rule = 'test <- /\\/one\\//'
+        res = peg_parser.parse(rule)
+        expect = Rule('test', Rgx('/one/'))
+        self.assertAstEqual(expect, res)
+
+    def test_regex_with_escaped_bslashes_are_parsed(self):
+        rule = 'test <- /\\\\one\\\\/'
+        res = peg_parser.parse(rule)
+        expect = Rule('test', Rgx('\\one\\'))
+        self.assertAstEqual(expect, res)

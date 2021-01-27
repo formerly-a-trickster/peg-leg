@@ -58,16 +58,23 @@ rules = [
     Rule("string",
          Seq(Str('"'),
              Mult(0,
-                  Alt(Str('\\"'),
-                      Rule('dblslash'),
+                  Alt(Rule('escaped-quote'),
+                      Rule('escaped-bslash'),
                       Rgx(r'[^\\"]+'))),
              Str('"'))),
-    Rule("dblslash",
+    Rule("escaped-quote",
+         Str(r'\"')),
+    Rule("escaped-bslash",
          Str(r"\\")),
     Rule("regex",
          Seq(Str("/"),
-             Rgx(r'(\\/|[^/])*'),
+             Mult(0,
+                  Alt(Rule('escaped-fslash'),
+                      Rule('escaped-bslash'),
+                      Rgx('[^\\\\/]+'))),
              Str("/"))),
+    Rule("escaped-fslash",
+         Str(r"\/")),
     Rule("id",
          Rgx(r"[\w_-]+")),
     Rule("_",
@@ -129,13 +136,9 @@ def suffixed_action(raw):
         raise AssertionError(f"Unexpected suffix `{symbol}`")
 
 
-def string_action(raw: Tuple[str, List[str], str]):
+def join_segments(raw: Tuple[str, List[str], str]):
     string = ''.join(raw[1])
-    return Str(string)
-
-
-def dblslash_action(raw: str):
-    return "\\"
+    return string
 
 
 def middle(raw: Tuple[str, Any, str]) -> Any:
@@ -151,9 +154,11 @@ peg_parser.actions = {"grammar": grammar_action,
                       "prefixed": prefixed_action,
                       "suffixed": suffixed_action,
                       "group": lambda x: x[2],
-                      "string": string_action,
-                      "dblslash": dblslash_action,
-                      "regex": lambda x: Rgx(middle(x)),
+                      "string": lambda x: Str(join_segments(x)),
+                      "escaped-quote": lambda x: "\"",
+                      "escaped-bslash": lambda x: "\\",
+                      "regex": lambda x: Rgx(join_segments(x)),
+                      "escaped-fslash": lambda x: "/",
                       "id": lambda x: Rule(x)}
 peg_parser.grammar = peg_parser.rules['rule']
 peg_parser.link_rules()

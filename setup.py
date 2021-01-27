@@ -5,7 +5,7 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setuptools.setup(
     name="peg_leg",
-    version="0.2.0",
+    version="0.4.0",
     author="Gabriel Ionescu",
     author_email="gabe@erisian.tech",
     description="PEG parser generator",
