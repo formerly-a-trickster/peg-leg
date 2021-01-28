@@ -8,7 +8,7 @@ from .ast import GrammarResolver, Node, Rule, Seq, Alt, Mult, Opt, Str, Rgx, \
 
 class ParsingError(Exception):
     def __init__(self, msg: str, index: int, input: str):
-        lines = input.split('\n')
+        lines = [line + "\n" for line in input.split('\n')]
         curr_len = 0
         for line_no, line in enumerate(lines):
             if curr_len + len(line) > index:
