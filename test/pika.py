@@ -11,6 +11,7 @@ if __name__ == "__main__":
     #                  Rule("P"),
     #                  Str(")")))),
     # )
+
     # g = Grammar(
     #     Rule("primary",
     #          Alt(Rule("field-access"),
@@ -27,6 +28,8 @@ if __name__ == "__main__":
     #              Str("]"))),
     #     Rule("id", Rgx("[a-z]"))
     # )
+    # p = PikaParser(g, "a.b[c]")
+
     # g = Grammar(
     #     Rule("dish", Seq(Rule("ingredient"),
     #                      Mult(0,
@@ -36,6 +39,7 @@ if __name__ == "__main__":
     #                            Str("stick"),
     #                            Str("berry")))
     # )
+
     # g = Grammar(
     #     Rule("cat", Seq(Str("cat-"),
     #                     NLook(Str("a")),
@@ -45,6 +49,7 @@ if __name__ == "__main__":
     #                        Str("alpaca"),
     #                        Str("dog")))
     # )
+
     g = Grammar(
         Rule('expr', Alt(Seq(Rule('expr'),
                              Str('+'),
@@ -52,6 +57,6 @@ if __name__ == "__main__":
                          Rule('num'))),
         Rule('num', Mult(1, Rgx('[0-9]')))
     )
-    p = PikaParser(g, "420+69+314")
+    p = PikaParser(g, "1+2+3+4")
     print(p.parse())
     pass

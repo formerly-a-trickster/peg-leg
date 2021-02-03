@@ -99,6 +99,9 @@ class Seq(MultiSubClause):
         super().__init__()
         self.clauses = list(subclauses)
 
+    def __iter__(self):
+        return reversed(self.clauses)
+
     def __str__(self):
         return f'({" ".join(str(clause) for clause in self)})'
 

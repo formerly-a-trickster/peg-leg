@@ -86,22 +86,22 @@ class Grammar:
 
 
 class MemoKey:
-    start: int
+    end: int
     clause: Clause
 
-    def __init__(self, start, clause):
-        self.start = start
+    def __init__(self, end, clause):
+        self.end = end
         self.clause = clause
 
     def __repr__(self):
-        return f"MemoKey({self.start}, {self.clause})"
+        return f"MemoKey({self.end}, {self.clause})"
 
     def __hash__(self):
-        return hash((self.start, self.clause))
+        return hash((self.end, self.clause))
 
     def __eq__(self, other):
         return self.__class__ == other.__class__ and \
-               self.start == other.start and \
+               self.end == other.end and \
                self.clause == other.clause
 
 
@@ -137,7 +137,7 @@ class PikaParser:
         if key in self.memotable:
             return self.memotable[key]
         elif isinstance(key.clause, NLook):
-            key.clause.visit(self, key.start)
+            key.clause.visit(self, key.end)
         elif key.clause.matches_empty:
             return MemoMatch(0, None)
 
@@ -158,13 +158,13 @@ class PikaParser:
             return True
 
     def parse(self):
-        curr_index = len(self.input) - 1
+        curr_index = 1
         queue = ClauseQueue()
         terminals = {clause
                      for clause in self.grammar.all_clauses
                      if isinstance(clause, NoSubClause)}
 
-        while curr_index >= 0:
+        while curr_index <= len(self.input):
             for terminal in terminals:
                 queue.schedule(terminal)
             while queue:
@@ -184,9 +184,9 @@ class PikaParser:
                     for parent in clause.dependant:
                         if parent.matches_empty:
                             queue.schedule(parent)
-            curr_index -= 1
+            curr_index += 1
 
-        top_key = MemoKey(0, self.grammar.top)
+        top_key = MemoKey(len(self.input), self.grammar.top)
         if top_key in self.memotable:
             match = self.memotable[top_key]
             if match.length == len(self.input):
@@ -195,12 +195,14 @@ class PikaParser:
 
     def visit_str(self, str, index):
         str_len = len(str.string)
-        if len(self.input[index:]) >= str_len and \
-                str.string == self.input[index:index + str_len]:
+        if len(self.input[:index]) >= str_len and \
+                str.string == self.input[index - str_len:index]:
             return MemoMatch(str_len, str.string)
 
     def visit_rgx(self, rgx, index):
-        match = re.match(rgx.pattern, self.input[index:])
+        if index == 0:
+            return
+        match = re.match(rgx.pattern, self.input[index - 1:index])
         if match:
             result = match.group()
             return MemoMatch(len(result), result)
@@ -213,10 +215,10 @@ class PikaParser:
             match = self.find_match(key)
             if match:
                 res.append(match.content)
-                curr_index += match.length
+                curr_index -= match.length
             else:
                 return None
-        return MemoMatch(curr_index - index, res)
+        return MemoMatch(index - curr_index, list(reversed(res)))
 
     def visit_alt(self, alt, index):
         for prec, clause in enumerate(alt, start=1):
