@@ -57,6 +57,6 @@ if __name__ == "__main__":
                          Rule('num'))),
         Rule('num', Mult(1, Rgx('[0-9]')))
     )
-    p = PikaParser(g, "1+2+3+4")
+    p = PikaParser(g, """expr <- cat;""")
     print(p.parse())
     pass

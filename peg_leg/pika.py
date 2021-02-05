@@ -1,42 +1,56 @@
 import re
-from typing import Dict, Set, Any, Tuple
+from typing import Dict, Set, Any, Tuple, List
 
 from peg_leg.ast import Clause, Rule, Alt, Rgx, Seq, Str, GrammarResolver, \
     NoSubClause, NLook
 from peg_leg.utils import ClauseQueue
 
 
-def reachable_clauses(clause, visited: Set[Clause]):
-    clauses = []
+def reachable_from_clause(clause: Clause, visited: Set[Clause]) -> List[Clause]:
+    reachable = []
     if clause not in visited:
         visited.add(clause)
         for subclause in clause:
-            clauses.extend(reachable_clauses(subclause, visited))
-        clauses.append(clause)
-    return clauses
+            reachable.extend(reachable_from_clause(subclause, visited))
+        reachable.append(clause)
+    return reachable
 
 
-def find_cycle_head_clauses(clause,
-                            discovered: Set[Clause],
-                            finished: Set[Clause]):
-    discovered.add(clause)
+def reachable_from(*clauses):
+    visited = set()
+    reachable = []
+    for clause in clauses:
+        reachable.extend(reachable_from_clause(clause, visited))
+    return reachable
+
+
+def cycle_heads_in_clause(clause,
+                          discovered: Set[Clause],
+                          finished: Set[Clause]):
     heads = set()
+    discovered.add(clause)
     for subclause in clause:
         if subclause in discovered:
             # reached a cycle
             heads.add(subclause)
         elif subclause not in finished:
-            heads |= find_cycle_head_clauses(subclause, discovered, finished)
+            heads |= cycle_heads_in_clause(subclause, discovered, finished)
     discovered.remove(clause)
     finished.add(clause)
     return heads
 
 
+def cycle_heads_in(*clauses):
+    discovered = set()
+    finished = set()
+    heads = set()
+    for clause in clauses:
+        heads |= cycle_heads_in_clause(clause, discovered, finished)
+    return heads
+
+
 def topo_sort(all_rules):
-    visited = set()
-    all_clauses_unordered = []
-    for clause in all_rules:
-        all_clauses_unordered.extend(reachable_clauses(clause, visited))
+    all_clauses_unordered = reachable_from(*all_rules)
 
     top_clauses = set(all_clauses_unordered)
     for clause in all_clauses_unordered:
@@ -45,21 +59,10 @@ def topo_sort(all_rules):
                 top_clauses.remove(subclause)
 
     dfs_roots = list(top_clauses)
-    cycle_discovered = set()
-    cycle_finished = set()
-    cycle_head_clauses = set()
-    for clause in top_clauses:
-        cycle_head_clauses |= find_cycle_head_clauses(
-            clause, cycle_discovered, cycle_finished)
-    for rule in all_rules:
-        cycle_head_clauses |= find_cycle_head_clauses(
-            rule, cycle_discovered, cycle_finished)
+    cycle_head_clauses = cycle_heads_in(*top_clauses, *all_rules)
 
     dfs_roots.extend(cycle_head_clauses)
-    all_clauses = []
-    reachable_visited = set()
-    for top_clause in dfs_roots:
-        all_clauses.extend(reachable_clauses(top_clause, reachable_visited))
+    all_clauses = reachable_from(*dfs_roots)
     for i, clause in enumerate(all_clauses):
         clause.topo_idx = i
     return all_clauses
@@ -233,13 +236,13 @@ class PikaParser:
         key = MemoKey(index, mult.clause)
         match = self.find_match(key)
         if match:
-            tail_key = MemoKey(index + match.length, mult)
+            tail_key = MemoKey(index - match.length, mult)
             tail_match = self.find_match(tail_key)
-            if tail_match:
+            if tail_match and tail_match.length > 0:
                 return MemoMatch(match.length + tail_match.length,
-                                 [match.content, tail_match.content])
+                                 tail_match.content + [match.content])
             else:
-                return MemoMatch(match.length, match.content)
+                return MemoMatch(match.length, [match.content])
         elif mult.min == 0:
             return MemoMatch(0, None)
         else:

@@ -84,6 +84,12 @@ class Rule(SingleSubClause):
         return self.__class__ == other.__class__ and \
                self.name == other.name
 
+    def __repr__(self):
+        if self.clause:
+            return f"Rule({repr(self.name)}, {repr(self.clause)})"
+        else:
+            return f"Rule({repr(self.name)})"
+
     def __str__(self):
         return f"{self.name}"
 
@@ -102,8 +108,11 @@ class Seq(MultiSubClause):
     def __iter__(self):
         return reversed(self.clauses)
 
+    def __repr__(self):
+        return f'Seq({", ".join(reversed([repr(clause) for clause in self]))})'
+
     def __str__(self):
-        return f'({" ".join(str(clause) for clause in self)})'
+        return f'({" ".join(reversed([str(clause) for clause in self]))})'
 
     def determine_matches_empty(self):
         for clause in self:
@@ -127,6 +136,9 @@ class Alt(MultiSubClause):
     def __init__(self, *subclauses: Clause):
         super().__init__()
         self.clauses = list(subclauses)
+
+    def __repr__(self):
+        return f'Alt({", ".join(repr(clause) for clause in self)})'
 
     def __str__(self):
         return " | ".join(str(clause) for clause in self)
@@ -159,6 +171,9 @@ class Mult(SingleSubClause):
                self.min == other.min and \
                self.clause == other.clause
 
+    def __repr__(self):
+        return f'Mult({self.min}, {repr(self.clause)})'
+
     def __str__(self):
         if self.min == 0:
             symbol = "*"
@@ -182,6 +197,9 @@ class Opt(SingleSubClause):
         super().__init__()
         self.clause = clause
 
+    def __repr__(self):
+        return f"Opt({repr(self.clause)})"
+
     def __str__(self):
         return f"{self.clause}?"
 
@@ -196,6 +214,9 @@ class Look(SingleSubClause):
     def __init__(self, clause):
         super().__init__()
         self.clause = clause
+
+    def __repr__(self):
+        return f"Look({repr(self.clause)})"
 
     def __str__(self):
         return f"&{self.clause}"
@@ -214,6 +235,9 @@ class NLook(SingleSubClause):
     def __init__(self, clause):
         super().__init__()
         self.clause = clause
+
+    def __repr__(self):
+        return f"NLook({repr(self.clause)})"
 
     def __str__(self):
         return f"!{self.clause}"
@@ -243,7 +267,7 @@ class Str(NoSubClause):
                self.string == other.string
 
     def __repr__(self):
-        return f"Str(\"{self.string}\")"
+        return f"Str({repr(self.string)})"
 
     def __str__(self):
         return f'"{self.string}"'
@@ -268,6 +292,9 @@ class Rgx(NoSubClause):
     def __eq__(self, other):
         return self.__class__ == other.__class__ and \
                self.pattern == other.pattern
+
+    def __repr__(self):
+        return f"Rgx({repr(self.pattern)})"
 
     def __str__(self):
         return f'/{self.pattern}/'
