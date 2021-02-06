@@ -31,16 +31,6 @@ if __name__ == "__main__":
     # p = PikaParser(g, "a.b[c]")
 
     # g = Grammar(
-    #     Rule("dish", Seq(Rule("ingredient"),
-    #                      Mult(0,
-    #                           Seq(Str(" and "),
-    #                               Rule("ingredient"))))),
-    #     Rule("ingredient", Alt(Str("fish"),
-    #                            Str("stick"),
-    #                            Str("berry")))
-    # )
-
-    # g = Grammar(
     #     Rule("cat", Seq(Str("cat-"),
     #                     NLook(Str("a")),
     #                     Rule("animal"))),
@@ -50,13 +40,37 @@ if __name__ == "__main__":
     #                        Str("dog")))
     # )
 
+    # g = Grammar(
+    #     Rule('expr', Alt(Seq(Rule('expr'),
+    #                          Str('+'),
+    #                          Rule('num')),
+    #                      Rule('num'))),
+    #     Rule('num', Mult(1, Rgx('[0-9]')))
+    # )
+
+    # g = Grammar(
+    #     Rule('pets',
+    #          Seq(Str('cats'),
+    #              Str(' and '),
+    #              Str('dogs')))
+    # )
+    # p = PikaParser(g, "cats and dogs")
+
+    # g = Grammar(
+    #     Rule("dish",
+    #          Seq(Rule("ingredient"),
+    #              Str(" and "),
+    #              Rule("ingredient"))),
+    #     Rule("ingredient", Alt(Str("fish"),
+    #                            Str("stick"),
+    #                            Str("berry")))
+    # )
+    # p = PikaParser(g, "fish and stick")
+
     g = Grammar(
-        Rule('expr', Alt(Seq(Rule('expr'),
-                             Str('+'),
-                             Rule('num')),
-                         Rule('num'))),
-        Rule('num', Mult(1, Rgx('[0-9]')))
+        Rule("cats",
+             Mult(0, Str("cat")))
     )
-    p = PikaParser(g, """expr <- cat;""")
+    p = PikaParser(g, "")
     print(p.parse())
     pass

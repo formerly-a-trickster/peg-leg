@@ -6,17 +6,15 @@ Node = Union['Rule', 'Seq', 'Alt', 'Mult', 'Opt', 'Look', 'NLook', 'Str', 'Rgx']
 
 
 class Clause(ABC):
-    topo_idx: int
-    dependant: Set['Clause']
+    priority: int
+    seeds: Set['Clause']
+    saplings: Set['Clause']
     matches_empty: Optional[bool]
 
     def __init__(self):
-        self.dependant = set()
+        self.saplings = set()
+        self.seeds = set()
         self.matches_empty = None
-
-    def depend_on_child(self):
-        for child in self:
-            child.dependant.add(self)
 
     @abstractmethod
     def __iter__(self):
@@ -28,6 +26,14 @@ class Clause(ABC):
 
     @abstractmethod
     def __eq__(self, other):
+        pass
+
+    @abstractmethod
+    def determine_seeds(self):
+        pass
+
+    @abstractmethod
+    def determine_saplings(self):
         pass
 
     @abstractmethod
@@ -63,10 +69,22 @@ class SingleSubClause(Clause, ABC):
         return self.__class__ == other.__class__ and \
                self.clause == other.clause
 
+    def determine_seeds(self):
+        self.seeds |= self.clause.seeds
+
+    def determine_saplings(self):
+        self.clause.saplings.add(self)
+
 
 class NoSubClause(Clause, ABC):
     def __iter__(self):
         return iter([])
+
+    def determine_seeds(self):
+        self.seeds = {self}
+
+    def determine_saplings(self):
+        pass
 
 
 class Rule(SingleSubClause):
@@ -85,10 +103,7 @@ class Rule(SingleSubClause):
                self.name == other.name
 
     def __repr__(self):
-        if self.clause:
-            return f"Rule({repr(self.name)}, {repr(self.clause)})"
-        else:
-            return f"Rule({repr(self.name)})"
+        return f"Rule({repr(self.name)})"
 
     def __str__(self):
         return f"{self.name}"
@@ -105,14 +120,11 @@ class Seq(MultiSubClause):
         super().__init__()
         self.clauses = list(subclauses)
 
-    def __iter__(self):
-        return reversed(self.clauses)
-
     def __repr__(self):
-        return f'Seq({", ".join(reversed([repr(clause) for clause in self]))})'
+        return f'Seq({", ".join(repr(clause) for clause in self)})'
 
     def __str__(self):
-        return f'({" ".join(reversed([str(clause) for clause in self]))})'
+        return f'({" ".join(str(clause) for clause in self)})'
 
     def determine_matches_empty(self):
         for clause in self:
@@ -122,11 +134,17 @@ class Seq(MultiSubClause):
                 self.matches_empty = False
                 return
 
-    def depend_on_child(self):
-        for child in self:
-            child.dependant.add(self)
-            if not child.matches_empty:
-                break
+    def determine_seeds(self):
+        for clause in self:
+            self.seeds |= clause.seeds
+            if not clause.matches_empty:
+                return
+
+    def determine_saplings(self):
+        for clause in self:
+            clause.saplings.add(self)
+            if not clause.matches_empty:
+                return
 
     def visit(self, visitor, *a, **kw):
         return visitor.visit_seq(self, *a, **kw)
@@ -150,6 +168,14 @@ class Alt(MultiSubClause):
             elif clause.matches_empty == True:
                 self.matches_empty = True
                 return
+
+    def determine_seeds(self):
+        for clause in self:
+            self.seeds |= clause.seeds
+
+    def determine_saplings(self):
+        for clause in self:
+            clause.saplings.add(self)
 
     def visit(self, visitor, *a, **kw):
         return visitor.visit_alt(self, *a, **kw)

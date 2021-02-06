@@ -19,9 +19,9 @@ class ClauseQueue:
 
     def schedule(self, clause):
         for i, item in enumerate(self.queue):
-            if clause.topo_idx > item.topo_idx:
+            if clause.priority > item.priority:
                 continue
-            elif clause.topo_idx == item.topo_idx:
+            elif clause.priority == item.priority:
                 return
             else:
                 self.queue.insert(i, clause)
