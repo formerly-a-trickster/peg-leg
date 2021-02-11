@@ -1,5 +1,5 @@
 from peg_leg.ast import Rule, Seq, Str, Alt, Rgx, Opt, Mult, Look, NLook
-from peg_leg.pika import Grammar, PikaParser
+from peg_leg.parser import Grammar, Parser
 
 if __name__ == "__main__":
     # g = Grammar(
@@ -28,7 +28,7 @@ if __name__ == "__main__":
     #              Str("]"))),
     #     Rule("id", Rgx("[a-z]"))
     # )
-    # p = PikaParser(g, "a.b[c]")
+    # p = Parser(g, "a.b[c]")
 
     # g = Grammar(
     #     Rule("cat", Seq(Str("cat-"),
@@ -39,14 +39,31 @@ if __name__ == "__main__":
     #                        Str("alpaca"),
     #                        Str("dog")))
     # )
+    # p = Parser(g, "cat-dog")
+
+    # g = Grammar(
+    #     Rule("eor",
+    #          Seq(Rule("eand"),
+    #              Mult(0, Seq(Str(" or "),
+    #                          Rule("eand"))))),
+    #     Rule("eand",
+    #          Seq(Rule("bool"),
+    #              Mult(0, Seq(Str(" and "),
+    #                          Rule("bool"))))),
+    #     Rule("bool",
+    #          Alt(Str("true"),
+    #              Str("false")))
+    # )
+    # p = Parser(g, "true")
 
     # g = Grammar(
     #     Rule('expr', Alt(Seq(Rule('expr'),
     #                          Str('+'),
     #                          Rule('num')),
     #                      Rule('num'))),
-    #     Rule('num', Mult(1, Rgx('[0-9]')))
+    #     Rule('num', Str('7'))
     # )
+    # p = Parser(g, "7+7+7")
 
     # g = Grammar(
     #     Rule('pets',
@@ -54,7 +71,7 @@ if __name__ == "__main__":
     #              Str(' and '),
     #              Str('dogs')))
     # )
-    # p = PikaParser(g, "cats and dogs")
+    # p = Parser(g, "cats and dogs")
 
     # g = Grammar(
     #     Rule("dish",
@@ -65,12 +82,33 @@ if __name__ == "__main__":
     #                            Str("stick"),
     #                            Str("berry")))
     # )
-    # p = PikaParser(g, "fish and stick")
+    # p = Parser(g, "fish and berry")
+
+    # g = Grammar(
+    #     Rule("cats",
+    #          Mult(0, Str("cat")))
+    # )
+    # p = Parser(g, "catcatcatcatcat")
+
+    # g = Grammar(
+    #     Rule("a",
+    #          Seq(Str("a"),
+    #              Rule("a-or-b"))),
+    #     Rule("b",
+    #          Seq(Str("b"),
+    #              Rule("a-or-b"))),
+    #     Rule("a-or-b",
+    #          Alt(Rule("a"),
+    #              Rule("b")))
+    # )
 
     g = Grammar(
-        Rule("cats",
-             Mult(0, Str("cat")))
+        Rule("cat",
+             Seq(Opt(Seq(Str("c"),
+                         Str("a"))),
+                 Str("t")))
     )
-    p = PikaParser(g, "")
+    p = Parser(g, "t")
+
     print(p.parse())
     pass

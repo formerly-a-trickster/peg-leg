@@ -1,9 +1,10 @@
 import re
 from abc import abstractmethod, ABC
+from collections import defaultdict
 from typing import Dict, Set, Any, Tuple, List
 
-from peg_leg.ast import Clause, Rule, Alt, Rgx, Seq, Str, GrammarResolver, \
-    NoSubClause, NLook
+from peg_leg.ast import Clause, Rule, Alt, Rgx, Seq, Str, RuleResolver, \
+    NoSubClause, NLook, extend_clauses, SingleSubClause
 from peg_leg.utils import ClauseQueue
 
 
@@ -69,6 +70,38 @@ def topo_sort(all_rules):
     return all_clauses
 
 
+class SeedResolver:
+    def visit_seq(self, seq):
+        seeds = seq.clauses[0].seeds
+        if seq.seeds != seeds:
+            seq.seeds = seeds
+            for parent in seq.saplings:
+                parent.visit(self)
+
+    def visit_alt(self, alt):
+        seeds = []
+        for clause in alt:
+            for seed in clause.seeds:
+                if seed not in seeds:
+                    seeds.append(seed)
+        seeds = tuple(seeds)
+        if alt.seeds != seeds:
+            alt.seeds = seeds
+            for parent in alt.saplings:
+                parent.visit(self)
+
+    def visit_singlesub(self, singlesub):
+        if singlesub.seeds != singlesub.clause.seeds:
+            singlesub.seeds = singlesub.clause.seeds
+            for parent in singlesub.saplings:
+                parent.visit(self)
+
+    def visit_nosub(self, nosub):
+        nosub.seeds = (nosub,)
+        for parent in nosub.saplings:
+            parent.visit(self)
+
+
 class Grammar:
     all_rules: Dict[str, Rule]
     all_clauses: Set[Clause]
@@ -78,13 +111,18 @@ class Grammar:
         self.all_rules = {rule.name: rule for rule in rules}
         self.top = rules[0]
         for rule in self.all_rules.values():
-            rule.clause.visit(GrammarResolver(), self.all_rules)
+            rule.clause.visit(RuleResolver(self.all_rules))
         all_clauses = topo_sort(self.all_rules.values())
 
         for clause in all_clauses:
             clause.determine_matches_empty()
             clause.determine_saplings()
-            clause.determine_seeds()
+
+        sr = SeedResolver()
+        terminals = [t for t in all_clauses if isinstance(t, NoSubClause)]
+        for t in terminals:
+            t.visit(sr)
+
         for clause in all_clauses:
             saplings = [str(s) for s in clause.saplings]
             saplings = "\n      ".join(saplings)
@@ -162,14 +200,16 @@ class MemoFail(MemoEntry):
             return f"MemoFail({self.error}, {self.alt_prec})"
 
 
-class PikaParser:
+class Parser:
     memotable: Dict[MemoKey, MemoMatch]
     grammar: Grammar
     input: str
+    matches: int
 
     def __init__(self, grammar, input):
         self.grammar = grammar
         self.input = input
+        self.depth = 0
 
         self.memotable = {}
 
@@ -195,32 +235,42 @@ class PikaParser:
         else:
             return self.grow(index, clause)
 
-    def grow(self, index, clause):
-        assert clause.seeds, f"Cannot grow `{clause}`, no available seeds"
+    def grow(self, index, target):
+        assert target.seeds, f"Cannot grow `{target}`, no available seeds"
 
-        queue = ClauseQueue()
-        for seed in clause.seeds:
-            queue.schedule(seed)
-        while queue:
-            current = queue.pop()
+        pad = " " * 4 * self.depth
+        print(f"{pad}Growing clause `{target}`:")
+        self.depth += 1
+        pad += " " * 4
+        stack = []
+        for seed in reversed(target.seeds):
+            stack.append(seed)
+        while stack:
+            print(f"{pad}Stack {stack}")
+            current = stack.pop()
             key = MemoKey(index, current)
             match = current.visit(self, index)
             stored = False
             if match.success:
-                print(f"Matched `{current}` @ {index}")
+                print(f"{pad}Matched `{current}` @ {index}")
                 stored = self.add_match(key, match)
             if stored:
-                for parent in current.saplings:
-                    if parent.priority <= clause.priority:
-                        queue.schedule(parent)
+                if key.clause == target:
+                    print(f"{pad}Reached target clause `{target}`\n"
+                          f"{pad}Discarded: {stack}")
+                    stack = []
+                for parent in reversed(current.saplings):
+                    if parent.priority <= target.priority:
+                        stack.append(parent)
             else:
-                print(f"Failed to match `{current}` @ {index}")
+                print(f"{pad}Failed to match `{current}` @ {index}")
                 self.memotable[key] = match
-                for parent in current.saplings:
+                for parent in reversed(current.saplings):
                     if parent.matches_empty and \
-                            parent.priority <= clause.priority:
-                        queue.schedule(parent)
-        key = MemoKey(index, current)
+                            parent.priority <= target.priority:
+                        stack.append(parent)
+        self.depth -= 1
+        key = MemoKey(index, target)
         if key in self.memotable:
             return self.memotable[key]
 
@@ -247,10 +297,10 @@ class PikaParser:
     def visit_alt(self, alt, index):
         for clause in alt:
             match = self.match(index, clause)
-            if match.success:
-                return match
-            else:
+            if not match or not match.success:
                 continue
+            else:
+                return match
         return MemoFail(f"Could not match `{alt}`")
 
     def visit_mult(self, mult, index):
@@ -265,12 +315,30 @@ class PikaParser:
                 times_matched += 1
             elif times_matched < mult.min:
                 return MemoFail(
-                        f"{mult} did not match at least {mult.min} times")
+                    f"{mult} did not match at least {mult.min} times")
             else:
                 return MemoMatch(curr_index, res)
 
     def visit_opt(self, opt, index):
         match = self.match(index, opt.clause)
+        if match.success:
+            return match
+        else:
+            return MemoMatch(0, None)
+
+    def visit_look(self, look, index):
+        match = self.match(index, look.clause)
+        if match.success:
+            return MemoMatch(0, match.content)
+        else:
+            return match
+
+    def visit_nlook(self, nlook, index):
+        match = self.match(index, nlook.clause)
+        if match.success:
+            return MemoFail(f"Did not expect to match {nlook.clause}")
+        else:
+            return MemoMatch(0, None)
 
     def visit_rule(self, rule, index):
         return self.match(index, rule.clause)

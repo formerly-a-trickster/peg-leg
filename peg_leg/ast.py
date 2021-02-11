@@ -5,15 +5,21 @@ from typing import Union, List, Dict, Set, Tuple, Optional
 Node = Union['Rule', 'Seq', 'Alt', 'Mult', 'Opt', 'Look', 'NLook', 'Str', 'Rgx']
 
 
+def extend_clauses(left, right):
+    for seed in right:
+        if seed not in left:
+            left.append(seed)
+
+
 class Clause(ABC):
     priority: int
-    seeds: Set['Clause']
-    saplings: Set['Clause']
+    seeds: Tuple['Clause', ...]
+    saplings: List['Clause']
     matches_empty: Optional[bool]
 
     def __init__(self):
-        self.saplings = set()
-        self.seeds = set()
+        self.saplings = []
+        self.seeds = tuple()
         self.matches_empty = None
 
     @abstractmethod
@@ -26,10 +32,6 @@ class Clause(ABC):
 
     @abstractmethod
     def __eq__(self, other):
-        pass
-
-    @abstractmethod
-    def determine_seeds(self):
         pass
 
     @abstractmethod
@@ -69,19 +71,16 @@ class SingleSubClause(Clause, ABC):
         return self.__class__ == other.__class__ and \
                self.clause == other.clause
 
-    def determine_seeds(self):
-        self.seeds |= self.clause.seeds
-
     def determine_saplings(self):
-        self.clause.saplings.add(self)
+        extend_clauses(self.clause.saplings, [self])
+
+    def visit(self, visitor, *a, **kw):
+        return visitor.visit_singlesub(self, *a, **kw)
 
 
 class NoSubClause(Clause, ABC):
     def __iter__(self):
         return iter([])
-
-    def determine_seeds(self):
-        self.seeds = {self}
 
     def determine_saplings(self):
         pass
@@ -112,7 +111,10 @@ class Rule(SingleSubClause):
         self.matches_empty = self.clause.matches_empty
 
     def visit(self, visitor, *a, **kw):
-        return visitor.visit_rule(self, *a, **kw)
+        if hasattr(visitor, 'visit_rule'):
+            return visitor.visit_rule(self, *a, **kw)
+        else:
+            return visitor.visit_singlesub(self, *a, **kw)
 
 
 class Seq(MultiSubClause):
@@ -134,20 +136,17 @@ class Seq(MultiSubClause):
                 self.matches_empty = False
                 return
 
-    def determine_seeds(self):
-        for clause in self:
-            self.seeds |= clause.seeds
-            if not clause.matches_empty:
-                return
-
     def determine_saplings(self):
         for clause in self:
-            clause.saplings.add(self)
+            extend_clauses(clause.saplings, [self])
             if not clause.matches_empty:
                 return
 
     def visit(self, visitor, *a, **kw):
-        return visitor.visit_seq(self, *a, **kw)
+        if hasattr(visitor, 'visit_seq'):
+            return visitor.visit_seq(self, *a, **kw)
+        else:
+            return visitor.visit_multisub(self, *a, **kw)
 
 
 class Alt(MultiSubClause):
@@ -169,16 +168,15 @@ class Alt(MultiSubClause):
                 self.matches_empty = True
                 return
 
-    def determine_seeds(self):
-        for clause in self:
-            self.seeds |= clause.seeds
-
     def determine_saplings(self):
         for clause in self:
-            clause.saplings.add(self)
+            extend_clauses(clause.saplings, [self])
 
     def visit(self, visitor, *a, **kw):
-        return visitor.visit_alt(self, *a, **kw)
+        if hasattr(visitor, 'visit_alt'):
+            return visitor.visit_alt(self, *a, **kw)
+        else:
+            return visitor.visit_multisub(self, *a, **kw)
 
 
 class Mult(SingleSubClause):
@@ -215,7 +213,10 @@ class Mult(SingleSubClause):
             self.matches_empty = self.clause.matches_empty
 
     def visit(self, visitor, *a, **kw):
-        return visitor.visit_mult(self, *a, **kw)
+        if hasattr(visitor, 'visit_mult'):
+            return visitor.visit_mult(self, *a, **kw)
+        else:
+            return visitor.visit_singlesub(self, *a, **kw)
 
 
 class Opt(SingleSubClause):
@@ -233,7 +234,10 @@ class Opt(SingleSubClause):
         self.matches_empty = True
 
     def visit(self, visitor, *a, **kw):
-        return visitor.visit_opt(self, *a, **kw)
+        if hasattr(visitor, 'visit_opt'):
+            return visitor.visit_opt(self, *a, **kw)
+        else:
+            return visitor.visit_singlesub(self, *a, **kw)
 
 
 class Look(SingleSubClause):
@@ -254,7 +258,10 @@ class Look(SingleSubClause):
         self.matches_empty = False
 
     def visit(self, visitor, *a, **kw):
-        return visitor.visit_look(self, *a, **kw)
+        if hasattr(visitor, 'visit_look'):
+            return visitor.visit_look(self, *a, **kw)
+        else:
+            return visitor.visit_singlesub(self, *a, **kw)
 
 
 class NLook(SingleSubClause):
@@ -275,7 +282,10 @@ class NLook(SingleSubClause):
         self.matches_empty = True
 
     def visit(self, visitor, *a, **kw):
-        return visitor.visit_nlook(self, *a, **kw)
+        if hasattr(visitor, 'visit_nlook'):
+            return visitor.visit_nlook(self, *a, **kw)
+        else:
+            return visitor.visit_singlesub(self, *a, **kw)
 
 
 class Str(NoSubClause):
@@ -302,7 +312,10 @@ class Str(NoSubClause):
         self.matches_empty = len(self.string) == 0
 
     def visit(self, visitor, *a, **kw):
-        return visitor.visit_str(self, *a, **kw)
+        if hasattr(visitor, 'visit_str'):
+            return visitor.visit_str(self, *a, **kw)
+        else:
+            return visitor.visit_nosub(self, *a, **kw)
 
 
 class Rgx(NoSubClause):
@@ -329,44 +342,32 @@ class Rgx(NoSubClause):
         self.matches_empty = False
 
     def visit(self, visitor, *a, **kw):
-        return visitor.visit_rgx(self, *a, **kw)
+        if hasattr(visitor, 'visit_rgx'):
+            return visitor.visit_rgx(self, *a, **kw)
+        else:
+            return visitor.visit_nosub(self, *a, **kw)
 
 
-class GrammarResolver:
-    def visit_rule(self, rule: Rule, rules) -> Rule:
-        if rule.name in rules:
-            return rules[rule.name]
+class RuleResolver:
+    rules: Dict[str, Rule]
+
+    def __init__(self, rules):
+        self.rules = rules
+
+    def visit_rule(self, rule: Rule) -> Rule:
+        if rule.name in self.rules:
+            return self.rules[rule.name]
         else:
             raise AssertionError(f"Cannot link rule {rule.name}")
 
-    def visit_seq(self, seq: Seq, rules) -> Seq:
-        for i, clause in enumerate(seq.clauses):
-            seq.clauses[i] = clause.visit(self, rules)
-        return seq
+    def visit_multisub(self, multi: MultiSubClause) -> MultiSubClause:
+        for i, subclause in enumerate(multi.clauses):
+            multi.clauses[i] = subclause.visit(self)
+        return multi
 
-    def visit_alt(self, alt: Alt, rules) -> Alt:
-        for i, clause in enumerate(alt.clauses):
-            alt.clauses[i] = clause.visit(self, rules)
-        return alt
+    def visit_singlesub(self, single: SingleSubClause) -> SingleSubClause:
+        single.clause = single.clause.visit(self)
+        return single
 
-    def visit_mult(self, mult: Mult, rules) -> Mult:
-        mult.clause = mult.clause.visit(self, rules)
-        return mult
-
-    def visit_opt(self, opt: Opt, rules) -> Opt:
-        opt.clause = opt.clause.visit(self, rules)
-        return opt
-
-    def visit_look(self, look: Look, rules) -> Look:
-        look.clause = look.clause.visit(self, rules)
-        return look
-
-    def visit_nlook(self, nlook: NLook, rules) -> NLook:
-        nlook.clause = nlook.clause.visit(self, rules)
-        return nlook
-
-    def visit_str(self, string: Str, rules) -> Str:
-        return string
-
-    def visit_rgx(self, regex: Rgx, rules) -> Rgx:
-        return regex
+    def visit_nosub(self, none: NoSubClause) -> NoSubClause:
+        return none
